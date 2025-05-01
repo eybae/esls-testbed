@@ -1,21 +1,12 @@
-# ✅ 수정 완료된 line_zone.py - 방향성까지 반영 최종 버전
-import sys
-sys.path.insert(0, "/usr/lib/python3/dist-packages/") 
-
 import cv2
+import numpy as np
 from datetime import datetime
+import time
 
 class LineZoneManager:
     def __init__(self):
-        self.person_activated = set()
-        self.vehicle_activated = set()
-        self.person_crossed = set()
-        self.vehicle_crossed = set()
-
-        self.person_memory_y = dict()
-        self.vehicle_memory_y = dict()
-
-        self.PERSON_LINE_Y = 110
+        # 라인 설정
+        self.PERSON_LINE_Y = 150
         self.PERSON_X1 = 130
         self.PERSON_X2 = 450
 
@@ -24,42 +15,36 @@ class LineZoneManager:
         self.VEHICLE_X2 = 640
         self.VEHICLE_STOP_X_THRESHOLD = 350
 
-    def check_person_cross(self, track_id, cx, cy):
-        if track_id in self.person_crossed:
-            return False
+        # 차량 감지 영역 (폴리곤)
+        self.POLYGON = np.array([
+            [280, 480],
+            [310, 70],
+            [390, 70],
+            [640, 220],
+            [640, 480]
+        ])
 
-        if cy >= self.PERSON_LINE_Y:
-            self.person_crossed.add(track_id)
-            self.person_activated.add(track_id)
-            return True
-        return False
-
-    def check_vehicle_cross(self, track_id, cx, cy):
-        prev_y = self.vehicle_memory_y.get(track_id, None)
-
-        if prev_y is None:
-            self.vehicle_memory_y[track_id] = cy
-            return False
-
-        if track_id in self.vehicle_crossed:
-            return False
-
-        # 방향성 + crossing 기준
-        if prev_y <= self.VEHICLE_LINE_Y and cy > self.VEHICLE_LINE_Y and prev_y < cy:
-            self.vehicle_crossed.add(track_id)
-            self.vehicle_activated.add(track_id)
-            print(f"[Vehicle Crossing ✅ 아래 방향] Track ID: {track_id}")
-            return True
-
-        self.vehicle_memory_y[track_id] = cy
-        return False
+        self.person_crossed = set()
+        self.vehicle_crossed = set()
+        self.person_activated = set()
+        self.vehicle_activated = set()
+        
+        self.last_seen_time = time.time()
 
     def draw(self, frame, state):
-        cv2.line(frame, (self.PERSON_X1, self.PERSON_LINE_Y),
-                 (self.PERSON_X2, self.PERSON_LINE_Y), (0, 255, 0), 2)
-        cv2.line(frame, (self.VEHICLE_X1, self.VEHICLE_LINE_Y),
-                 (self.VEHICLE_X2, self.VEHICLE_LINE_Y), (255, 0, 0), 2)
-        cv2.putText(frame, f"State: {state}", (20, 40),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+        # 사람 감지 라인 (초록)
+        cv2.line(frame, (self.PERSON_X1, self.PERSON_LINE_Y), (self.PERSON_X2, self.PERSON_LINE_Y), (0, 255, 0), 2)
+        #cv2.putText(frame, "Person Line", (self.PERSON_X1 + 5, self.PERSON_LINE_Y - 10),
+        #            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+        # 차량 감지 영역 (폴리곤 - 파랑)
+        cv2.polylines(frame, [self.POLYGON], isClosed=True, color=(255, 0, 0), thickness=2)
+        #cv2.putText(frame, "Vehicle Zone", (self.POLYGON[1][0] + 5, self.POLYGON[1][1] + 15),
+        #            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+
+        # 현재 상태 출력
+        state_text = f"State: {state}"
+        cv2.putText(frame, state_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         cv2.putText(frame, now_str, (360, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        #cv2.rectangle(frame, (380, 85), (400, 70), (255, 0, 0), 2)
