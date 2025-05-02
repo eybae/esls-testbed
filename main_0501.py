@@ -15,7 +15,7 @@ from line_zone import LineZoneManager
 
 # 설정
 DAY_MODEL_PATH = "yolov8n.engine"
-#NIGHT_MODEL_PATH = "infrared_yolo.engine"
+NIGHT_MODEL_PATH = "infrared_yolo.engine"
 CAMERA_INDEX = 0
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
@@ -36,11 +36,9 @@ CLASS_NAMES = {
     7: "Truck"
 }
 VEHICLE_CLASS_IDS = [2, 3, 5, 7]  # Car, Motorcycle, Bus, Truck
-TURN_OFF_TIME = 10
 state = 0
 prev_state = -1
 last_active_time = time.time()
-
 
 vehicle_memory_point = dict()
 person_memory_y = dict()
@@ -79,24 +77,23 @@ def report_state_to_flask(new_state):
     except Exception as e:
         print(f"[Flask ERROR] 서버 전송 실패: {e}")
 
-#ef is_night_time(frame):
-#    return frame.mean() < 50
+def is_night_time(frame):
+    return frame.mean() < 50
 
 while True:
     ret, frame = cap.read()
     if not ret:
         break
 
-    #if is_night_time(frame):
-    #    if current_model_type != "night":
-    #        model = YOLO(NIGHT_MODEL_PATH)
-    #        current_model_type = "night"
-    #else:
-    #    if current_model_type != "day":
-    #        model = YOLO(DAY_MODEL_PATH)
-    #        current_model_type = "day"
-    
-    model = YOLO(DAY_MODEL_PATH)
+    if is_night_time(frame):
+        if current_model_type != "night":
+            model = YOLO(NIGHT_MODEL_PATH)
+            current_model_type = "night"
+    else:
+        if current_model_type != "day":
+            model = YOLO(DAY_MODEL_PATH)
+            current_model_type = "day"
+
     results = model.predict(frame)
     detections, classes = [], []
 
@@ -138,7 +135,7 @@ while True:
         if state in [1, 2, 3]:
             state = 4
             last_active_time = time.time()
-        elif state == 4 and time.time() - last_active_time > TURN_OFF_TIME:
+        elif state == 4 and time.time() - last_active_time > 5:
             state = 0
 
         if state != prev_state:
@@ -190,18 +187,16 @@ while True:
             vehicle_memory_point[track_id] = (cx, cy)
 
         elif class_id == 0:
-            prev_y = person_memory_y.get(track_id, cy - 5)
-            print(f"[Debug] Person {track_id}, prev_y={prev_y}, cy={cy}, cx={cx}, line={line_zone_manager.PERSON_LINE_Y}")
+            prev_y = person_memory_y.get(track_id, cy)
+            print(f"[Debug] Person ID={track_id}, prev_y={prev_y}, curr_y={cy}, line_y={line_zone_manager.PERSON_LINE_Y}")
 
-            # 정확한 로그/캡처 조건: 위에서 아래로 진입 + x범위 포함
-            if (145 < prev_y < 150) and cy >= 150 and (line_zone_manager.PERSON_X1 < cx < line_zone_manager.PERSON_X2):
-                if track_id not in line_zone_manager.person_crossed:
-                    line_zone_manager.person_crossed.add(track_id)
-                    logger.log_person(track_id, frame.copy(), class_name, speed=0, state=1, line_drawer=line_zone_manager)
-                    print(f"[Person Entry] ID={track_id}, cx={cx}, cy={cy}")
+            # 위에서 아래로 진입한 경우에만 로그/캡처 저장
+            if track_id not in line_zone_manager.person_crossed and prev_y <= line_zone_manager.PERSON_LINE_Y and cy > line_zone_manager.PERSON_LINE_Y:
+                line_zone_manager.person_crossed.add(track_id)
+                logger.log_person(track_id, frame.copy(), class_name, speed=0, state=1, line_drawer=line_zone_manager)
+                print(f"[Person Entry] ID={track_id}, cx={cx}, cy={cy}")
 
-            # 감지는 cy 기준으로만 처리
-            if (line_zone_manager.PERSON_X1 < cx < line_zone_manager.PERSON_X2) and (cy >= line_zone_manager.PERSON_LINE_Y):
+            if cy > line_zone_manager.PERSON_LINE_Y:
                 line_zone_manager.person_activated.add(track_id)
 
             person_memory_y[track_id] = cy
@@ -219,7 +214,7 @@ while True:
         if state in [1, 2, 3]:
             state = 4
             last_active_time = time.time()
-        elif state == 4 and time.time() - last_active_time > 10:
+        elif state == 4 and time.time() - last_active_time > 5:
             state = 0
     else:
         if line_zone_manager.person_activated and line_zone_manager.vehicle_activated:
@@ -232,7 +227,6 @@ while True:
     if state != prev_state:
         report_state_to_flask(state)
         prev_state = state
-        
 
     line_zone_manager.draw(frame, state)
     out.write(frame)

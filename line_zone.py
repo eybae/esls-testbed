@@ -8,7 +8,7 @@ class LineZoneManager:
         # 라인 설정
         self.PERSON_LINE_Y = 150
         self.PERSON_X1 = 130
-        self.PERSON_X2 = 450
+        self.PERSON_X2 = 480
 
         self.VEHICLE_LINE_Y = 70
         self.VEHICLE_X1 = 300
@@ -43,6 +43,12 @@ class LineZoneManager:
         #            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
 
         # 현재 상태 출력
+        if state == 0:
+            state_text = f"Lamp: OFF"
+            cv2.putText(frame, state_text, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
+        else:
+            state_text = f"Lamp: ON"
+            cv2.putText(frame, state_text, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
         state_text = f"State: {state}"
         cv2.putText(frame, state_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
