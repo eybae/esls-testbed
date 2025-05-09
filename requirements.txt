@@ -1,0 +1,14 @@
+
+ultralytics
+opencv-python
+numpy
+requests
+torch
+
+# Optional depending on your environment:
+tensorRT  # if you use TensorRT engine directly
+
+
+
+
+
