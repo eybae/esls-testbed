@@ -1,7 +1,8 @@
-__pycache__/
-*.pyc
+# .gitignore
+video/
 log/
 capture/
 *.engine
 *.pt
-.env
+*.onnx
+__pycache__/
